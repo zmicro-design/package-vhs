@@ -21,7 +21,7 @@ install() {
     platform="Darwin"
     ;;
   linux)
-    platform="Larwin"
+    platform="Linux"
     ;;
   *)
     log::error "[$(timestamp)] unsupport platform: $platform"
