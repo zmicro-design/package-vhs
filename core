@@ -1,0 +1,125 @@
+#!/bin/bash
+
+install() {
+  # prepare vars
+  local name="$PACKAGE_CORE_NAME"
+
+  log::info "[$(timestamp)][package][$name] preparing ..."
+
+  # get system os/arch
+  local os="$PACKAGE_OS"
+  local arch="$PACKAGE_OS_ARCH"
+  local kernel="$PACKAGE_OS_KERNEL"
+  local platform="$PACKAGE_OS_PLATFORM"
+  # usr_bin_dir
+  local usr_bin_dir="$PACKAGE_USER_BIN_DIR"
+  local tmp_dir="$PACKAGE_TMP_DIR"
+
+  #
+  case $platform in
+  darwin)
+    platform="Darwin"
+    ;;
+  linux)
+    platform="Larwin"
+    ;;
+  *)
+    log::error "[$(timestamp)] unsupport platform: $platform"
+    return 1
+    ;;
+  esac
+
+  case $arch in
+  arm64) ;;
+
+  amd64)
+    arch="x86_64"
+    ;;
+  *)
+    log::error "[$(timestamp)] unsupport arch: $arch"
+    return 1
+    ;;
+  esac
+  #
+
+  # # get latest version
+  # log::info "[$(timestamp)][package][$name] checking latest version ..."
+  # local latest_version=$(git::get_remote_latest_tag $PACKAGE_CORE_GIT_REPOSITORY)
+  # if [ "$?" != "0" ]; then
+  #   log::error "[$(timestamp)][package][$name] failed to get latest version ."
+  #   return 1
+  # fi
+  # PACKAGE_CORE_VERSION=$latest_version
+  # log::success "[$(timestamp)][package][$name] latest version: $PACKAGE_CORE_VERSION"
+
+  # files
+  local tmp_file="$name.tar.gz"
+  local source_bin_file="./${name}-${PACKAGE_CORE_VERSION#v}-${platform}-${arch}/$name"
+  # local target_bin_file="$usr_bin_dir/$name"
+
+  # prepare context
+  cd $tmp_dir
+
+  # reference: https://github.com/charmbracelet/vhs/releases
+  # example:
+  #   https://github.com/charmbracelet/vhs/releases/download/v0.3.0/vhs_0.3.0_Darwin_arm64.tar.gz
+  #   https://github.com/charmbracelet/vhs/releases/download/v0.3.0/vhs_0.3.0_Darwin_x86_64.tar.gz
+  #   https://github.com/charmbracelet/vhs/releases/download/v0.3.0/vhs_0.3.0_Linux_arm64.tar.gz
+  #   https://github.com/charmbracelet/vhs/releases/download/v0.3.0/vhs_0.3.0_Linux_x86_64.tar.gz
+  # generate url
+  local url="${PACKAGE_CORE_RELEASE_DOWNLOAD}/$PACKAGE_CORE_VERSION/${name}_${PACKAGE_CORE_VERSION#v}_${platform}_${arch}.tar.gz"
+  log::debug "[$(timestamp)][package][$name][$kernel][$arch] url: $url, file: ${tmp_file}, tmp_dir: $tmp_dir"
+
+  # download
+  log::info "[$(timestamp)][package][$name] downloading ..."
+  os::download $tmp_file $url
+  if [ "$?" != "0" ]; then
+    log::error "[$(timestamp)][package][$name] failed to download from $url ."
+    return 1
+  fi
+
+  # extract
+  log::info "[$(timestamp)][package][$name] extracting ..."
+  os::extract $tmp_file
+
+  # install
+  log::info "[$(timestamp)][package][$name] installing ..."
+  os::install $source_bin_file $usr_bin_dir $name
+
+  # Complex like maven-mvnd
+  #   # make executable
+  #   log::info "[$(timestamp)][package][$name] making executable ..."
+  #   chmod 755 $source_bin_file
+
+  #   # install
+  #   if [ -d "$usr_lib_dir/${name}" ]; then
+  #     log::info "[$(timestamp)][package][$name] removing old lib ..."
+  #     sudo rm -rf $usr_lib_dir/${name}
+  #   fi
+  #   log::info "[$(timestamp)][package][$name] installing lib ..."
+  #   sudo mv $lib_dir $usr_lib_dir/${name}
+
+  #   # install
+  #   log::info "[$(timestamp)][package][$name] installing bin ..."
+  #   sudo ln -sf $usr_lib_dir/${name}/bin/${PACKAGE_CORE_BIN_NAME} $usr_bin_dir/${PACKAGE_CORE_BIN_NAME}
+
+  #   # profile
+  #   log::success "[$(timestamp)][package][$name] config MVND_HOME=$usr_lib_dir/${name} to global env file ..."
+  #   local envs=$(
+  #     cat <<-END
+  # export MVND_HOME=$usr_lib_dir/${name}
+  # END
+  # )
+  #   config::profile "# ZMICRO PACKAGE MAVEN-MVND" "$envs"
+
+  if [ "$PLUGIN_PACKAGE_INSTALL_MODE" = "test" ]; then
+    log::info "[$(timestamp)][package][$name] mode: $PLUGIN_PACKAGE_INSTALL_MODE"
+    log::info "[$(timestamp)][package][$name] tmp_dir: $tmp_dir"
+  else
+    # clean
+    log::info "[$(timestamp)][package][$name] cleaning ..."
+    rm -rf $tmp_dir
+  fi
+}
+
+export -f install
